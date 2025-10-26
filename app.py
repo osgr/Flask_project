@@ -10,40 +10,11 @@ app = Flask(__name__)
 
 @app.route('/')
 def run():
-    return render_template('home.html')
-
-@app.route('/test')
-def test():
-    return "Flask app is working! Dashboard should be at /dashboard"
-
-@app.route('/routes')
-def list_routes():
-    routes = []
-    for rule in app.url_map.iter_rules():
-        routes.append(f"{rule.rule} -> {rule.endpoint}")
-    return "<br>".join(routes)
+    return render_template('index.html')
 
 @app.route('/dashboard')
 def dashboard():
-    try:
-        return render_template('dashboard.html')
-    except Exception as e:
-        return f"Error loading dashboard: {str(e)}", 500
-
-@app.route('/dashboard-simple')
-def dashboard_simple():
-    return """
-    <html>
-    <head><title>Simple Dashboard Test</title></head>
-    <body>
-        <h1>Crypto Dashboard Test</h1>
-        <p>If you can see this, the routing is working!</p>
-        <a href="/">Go to Calculator</a><br>
-        <a href="/dashboard">Go to Full Dashboard</a><br>
-        <a href="/test">Test Route</a>
-    </body>
-    </html>
-    """
+    return render_template('dashboard.html')
 
 def get_crypto_data():
     """Helper function to fetch crypto data from API"""
@@ -144,7 +115,7 @@ def marks():
     English = int(request.form['English'])
     result = Physics + Maths + Chemistry + Hindi + English
     Percentage = result/5
-    return render_template('home.html',Percentage=Percentage)
+    return render_template('index.html',Percentage=Percentage)
 
 if __name__=='__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
