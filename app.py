@@ -91,13 +91,19 @@ def download_csv():
                 current_time
             ])
         
-        # Create response
+        # Create response with proper encoding for production
         output.seek(0)
+        csv_content = output.getvalue()
+        
         response = Response(
-            output.getvalue(),
-            mimetype='text/csv',
+            csv_content,
+            mimetype='text/csv; charset=utf-8',
             headers={
-                'Content-Disposition': f'attachment; filename=crypto_prices_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+                'Content-Disposition': f'attachment; filename="crypto_prices_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"',
+                'Content-Type': 'text/csv; charset=utf-8',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
             }
         )
         
@@ -118,4 +124,4 @@ def marks():
     return render_template('index.html',Percentage=Percentage)
 
 if __name__=='__main__':
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(debug=True, host='127.0.0.1', port=5000)
