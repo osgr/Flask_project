@@ -1,6 +1,9 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 import requests
 import json
+import csv
+import io
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -12,8 +15,8 @@ def run():
 def dashboard():
     return render_template('dashboard.html')
 
-@app.route('/api/crypto-prices')
-def get_crypto_prices():
+def get_crypto_data():
+    """Helper function to fetch crypto data from API"""
     try:
         # Using CoinGecko API to get top 10 cryptocurrencies
         url = "https://api.coingecko.com/api/v3/coins/markets"
@@ -44,12 +47,63 @@ def get_crypto_prices():
                 'image': coin['image']
             })
         
-        return jsonify(formatted_data)
+        return formatted_data
         
     except requests.exceptions.RequestException as e:
-        return jsonify({'error': f'Failed to fetch crypto data: {str(e)}'}), 500
+        raise Exception(f'Failed to fetch crypto data: {str(e)}')
     except Exception as e:
-        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+        raise Exception(f'An error occurred: {str(e)}')
+
+@app.route('/api/crypto-prices')
+def get_crypto_prices():
+    try:
+        formatted_data = get_crypto_data()
+        return jsonify(formatted_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/download-csv')
+def download_csv():
+    try:
+        crypto_data = get_crypto_data()
+        
+        # Create CSV content
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            'Rank', 'Name', 'Symbol', 'Current Price (USD)', 
+            'Market Cap (USD)', '24h Change (%)', 'Download Time'
+        ])
+        
+        # Write data rows
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        for coin in crypto_data:
+            writer.writerow([
+                coin['market_cap_rank'],
+                coin['name'],
+                coin['symbol'],
+                f"${coin['current_price']:,.6f}" if coin['current_price'] < 1 else f"${coin['current_price']:,.2f}",
+                f"${coin['market_cap']:,.0f}",
+                f"{coin['price_change_percentage_24h']:.2f}%" if coin['price_change_percentage_24h'] else 'N/A',
+                current_time
+            ])
+        
+        # Create response
+        output.seek(0)
+        response = Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=crypto_prices_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/submit', methods=['POST'])
 def marks():
