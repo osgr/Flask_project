@@ -3,6 +3,7 @@ import requests
 import json
 import csv
 import io
+import os
 from datetime import datetime
 
 app = Flask(__name__)
@@ -117,4 +118,4 @@ def marks():
     return render_template('home.html',Percentage=Percentage)
 
 if __name__=='__main__':
-    app.run(debug=True)
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
