@@ -8,4 +8,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: SECRET_KEY
+        generateValue: true
     healthCheckPath: /
+    
+  - type: pserv
+    name: crypto-dashboard-db
+    plan: free
+    databaseName: crypto_dashboard
+    databaseUser: crypto_user

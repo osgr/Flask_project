@@ -1,12 +1,45 @@
 from flask import Flask, render_template, request, jsonify, Response
+from flask_sqlalchemy import SQLAlchemy
 import requests
 import json
 import csv
 import io
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+import uuid
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
+
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///crypto_dashboard.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Initialize database
+db = SQLAlchemy(app)
+
+# Database Models
+class DownloadRecord(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    download_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    filename = db.Column(db.String(255), nullable=False)
+    download_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    file_size = db.Column(db.Integer, nullable=True)
+    crypto_count = db.Column(db.Integer, nullable=False)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'download_id': self.download_id,
+            'filename': self.filename,
+            'download_time': self.download_time.strftime('%Y-%m-%d %H:%M:%S UTC'),
+            'file_size': self.file_size,
+            'crypto_count': self.crypto_count
+        }
 
 @app.route('/')
 def run():
@@ -95,11 +128,27 @@ def download_csv():
         output.seek(0)
         csv_content = output.getvalue()
         
+        # Generate filename
+        filename = f"crypto_prices_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        
+        # Store download record in database
+        try:
+            download_record = DownloadRecord(
+                filename=filename,
+                file_size=len(csv_content.encode('utf-8')),
+                crypto_count=len(crypto_data)
+            )
+            db.session.add(download_record)
+            db.session.commit()
+        except Exception as db_error:
+            # Log the error but don't fail the download
+            print(f"Database error: {db_error}")
+        
         response = Response(
             csv_content,
             mimetype='text/csv; charset=utf-8',
             headers={
-                'Content-Disposition': f'attachment; filename="crypto_prices_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"',
+                'Content-Disposition': f'attachment; filename="{filename}"',
                 'Content-Type': 'text/csv; charset=utf-8',
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
@@ -112,6 +161,20 @@ def download_csv():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/download-history')
+def download_history():
+    """API endpoint to get download history"""
+    try:
+        records = DownloadRecord.query.order_by(DownloadRecord.download_time.desc()).limit(50).all()
+        return jsonify([record.to_dict() for record in records])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/history')
+def history():
+    """Page to view download history"""
+    return render_template('history.html')
+
 @app.route('/submit', methods=['POST'])
 def marks():
     Physics=int(request.form['Physics'])
@@ -122,6 +185,10 @@ def marks():
     result = Physics + Maths + Chemistry + Hindi + English
     Percentage = result/5
     return render_template('index.html',Percentage=Percentage)
+
+# Initialize database tables
+with app.app_context():
+    db.create_all()
 
 if __name__=='__main__':
     app.run(debug=True, host='127.0.0.1', port=5000)
